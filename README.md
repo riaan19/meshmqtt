@@ -1,6 +1,6 @@
 # MeshMQTT
 
-MeshMQTT integrates Meshtastic with a private MQTT broker and provides a web dashboard for creating sensors in Home Assistant on a Raspberry Pi. This is for my own use and should not really be used by anyone else; if you break it not my problem. I'm posting it here for my own reference.
+MeshMQTT integrates Meshtastic with a private MQTT broker and provides a web dashboard for creating sensors in Home Assistant on a Raspberry Pi. This is for my own use and should not really be used by anyone else; if you break it or your own equipment or even strain the lora network not my problem. I'm posting it here for my own reference. There is 0 security when hosting this. Make sure you know what you are doing.
 
 ## Overview
 
