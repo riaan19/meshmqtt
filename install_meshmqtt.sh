@@ -137,4 +137,6 @@ log_message "Installation complete. The meshmqtt service is now running and set 
 log_message "All files are securely owned by $CURRENT_USER with no group/other access."
 log_message "If you need to configure config.json or other files, edit them in $INSTALL_DIR."
 log_message "The dashboard is accessible via http://$(hostname -I | awk '{print $1}'):5000 (check mesh_dashboard.py for port details)."
+log_message "Update MQTT server information on web interface and run"
+log_message "sudo systemctl restart meshmqtt.service"
 log_message "Installation log saved to $LOG_FILE."
