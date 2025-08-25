@@ -1,6 +1,7 @@
+```markdown
 # MeshMQTT
 
-MeshMQTT is a project that integrates Meshtastic connects to private Mqtt ands provides a web dashboard for creating sensors in home Assistant on a Raspberry Pi.
+MeshMQTT is a project that integrates Meshtastic with MQTT and provides a web dashboard for monitoring and control on a Raspberry Pi.
 
 ## Prerequisites
 
@@ -9,11 +10,11 @@ MeshMQTT is a project that integrates Meshtastic connects to private Mqtt ands p
 - **Meshtastic Device**: A compatible LoRa radio connected via USB or serial.
 - **Internet Connection**: Required for downloading dependencies and cloning the repository.
 - **Storage**: At least 2 GB of free space on the SD card.
-- **User Permissions**: Access to the `pi` user account with `sudo` privileges.
+- **User Permissions**: Access to a user account with `sudo` privileges.
 
 ## Installation
 
-The `install_meshmqtt.sh` script automates the setup process, installing dependencies, setting up a virtual environment, and configuring the service to run on boot.
+The `install_meshmqtt.sh` script automates the setup process, installing dependencies, setting up a virtual environment, and configuring the service to run on boot. It dynamically uses the current logged-in user's home directory.
 
 ### Steps to Install
 
@@ -51,7 +52,7 @@ The `install_meshmqtt.sh` script automates the setup process, installing depende
 
 - **Meshtastic Device**: Ensure your LoRa radio is connected via USB or serial. Update `config.json` (if used) with the correct serial port or device settings.
 - **MQTT Broker**: Configure MQTT settings in `config.json` or the main script if required.
-- **Customizations**: Edit `mesh_dashboard.py` or other files in `/home/pi/meshmqtt` for specific configurations.
+- **Customizations**: Edit `mesh_dashboard.py` or other files in `~/meshmqtt` (your home directory) for specific configurations.
 
 ## Troubleshooting
 
@@ -68,7 +69,9 @@ The `install_meshmqtt.sh` script automates the setup process, installing depende
 ## Notes
 
 - The script assumes `mesh_dashboard.py` is the main script. Update the systemd service file (`/etc/systemd/system/meshmqtt.service`) if your main script has a different name.
+- The script uses the current logged-in user's home directory (e.g., `/home/<your-username>/meshmqtt`) for installation.
 - For Raspberry Pi Zero or older models, ensure sufficient memory (consider increasing swap space) to handle dependency installation.
 - If using a non-Raspberry Pi OS, modify the script's package installation commands (e.g., use `dnf` for Fedora-based systems).
 
 For issues or contributions, please open an issue or pull request on the [GitHub repository](https://github.com/riaan19/meshmqtt).
+```
