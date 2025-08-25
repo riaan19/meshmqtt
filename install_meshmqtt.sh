@@ -1,10 +1,9 @@
-```bash
 #!/bin/bash
 
-# This script automates the installation of the MeshMQTT project on a Raspberry Pi.
-# It sets up a virtual environment, installs dependencies, and configures the main script
-# to run on startup using systemd. It uses the logged-in user's username for paths and
-# service configuration, even when run with sudo, and ensures all files are owned by the user.
+# This script automates the secure installation of the MeshMQTT project on a Raspberry Pi.
+# It sets up a virtual environment in the user's home directory, installs dependencies,
+# and configures a systemd service to run on startup as the current user.
+# The script ensures all files are owned by the user for security, and requires sudo for system changes.
 
 set -e  # Exit on any error
 
@@ -45,26 +44,26 @@ check_status "Failed to install system dependencies"
 
 # Check if the installation directory exists
 if [ -d "$INSTALL_DIR" ]; then
-    echo "Directory $INSTALL_DIR already exists. Removing and performing a clean install..."
+    echo "Directory $INSTALL_DIR already exists. Removing for a clean install..."
     sudo rm -rf "$INSTALL_DIR"
     check_status "Failed to remove existing $INSTALL_DIR"
 fi
 
-# Clone the repository to the current user's home directory
+# Clone the repository to the user's home directory as the user
 echo "Cloning MeshMQTT repository..."
 sudo -u "$CURRENT_USER" git clone https://github.com/riaan19/meshmqtt.git "$INSTALL_DIR"
 check_status "Failed to clone repository"
 
-# Ensure ownership of the installation directory
+# Ensure ownership and permissions for security
 sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
-sudo chmod -R u+rwX "$INSTALL_DIR"
-check_status "Failed to set ownership and permissions of $INSTALL_DIR"
+sudo chmod -R u+rwX,go-rwx "$INSTALL_DIR"  # User read/write/execute, no group/other access for security
+check_status "Failed to set ownership and secure permissions of $INSTALL_DIR"
 
 # Change to the project directory
 cd "$INSTALL_DIR"
 check_status "Failed to change to $INSTALL_DIR"
 
-# Create and activate virtual environment as the current user
+# Create and activate virtual environment as the user
 echo "Creating and activating virtual environment..."
 sudo -u "$CURRENT_USER" python3 -m venv venv
 check_status "Failed to create virtual environment"
@@ -73,7 +72,7 @@ check_status "Failed to set permissions for virtual environment"
 source venv/bin/activate
 check_status "Failed to activate virtual environment"
 
-# Install Python dependencies as the current user
+# Install Python dependencies as the user
 echo "Installing Python dependencies..."
 sudo -u "$CURRENT_USER" pip install meshtastic paho-mqtt flask
 check_status "Failed to install Python dependencies"
@@ -81,10 +80,10 @@ check_status "Failed to install Python dependencies"
 # Deactivate the virtual environment
 deactivate
 
-# Ensure ownership of all files after installation
+# Ensure final ownership and secure permissions
 sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
-sudo chmod -R u+rwX "$INSTALL_DIR"
-check_status "Failed to set final ownership and permissions of $INSTALL_DIR"
+sudo chmod -R u+rwX,go-rwx "$INSTALL_DIR"
+check_status "Failed to set final ownership and secure permissions of $INSTALL_DIR"
 
 # Create systemd service file for auto-start
 echo "Creating systemd service file..."
@@ -98,7 +97,7 @@ Wants=network-online.target
 User=$CURRENT_USER
 Group=$CURRENT_USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/venv/bin/python3 $INSTALL_DIR/mesh_dashboard.py
+ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/mesh_dashboard.py
 Restart=always
 RestartSec=10
 
@@ -121,6 +120,6 @@ echo "Checking service status..."
 sudo systemctl status meshmqtt.service
 
 echo "Installation complete. The meshmqtt service is now running and set to start on boot."
+echo "All files are securely owned by $CURRENT_USER with no group/other access."
 echo "If you need to configure config.json or other files, edit them in $INSTALL_DIR."
 echo "The dashboard is accessible via http://$(hostname -I | awk '{print $1}'):5000 (check mesh_dashboard.py for port details)."
-```
