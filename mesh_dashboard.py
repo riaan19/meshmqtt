@@ -123,6 +123,8 @@ def load_state():
                         known_nodes[node_id] = {k for k in known_nodes[node_id] if k in current_commands or k in NUMERIC_KEYS}
         except Exception as e:
             logger.warning(f"Failed to load state: {e}")
+    # Reset binary sensor states on startup
+    clear_binary_sensor_states()
     if mqtt_client and hasattr(mqtt_client, "is_connected") and mqtt_client.is_connected():
         for node_id in enabled_nodes:
             trigger_ha_discovery(node_id, enable=True)
@@ -134,7 +136,7 @@ def save_state():
         "node_info": node_info,
         "last_heard": last_heard,
         "custom_sensors": custom_sensors,
-        "sensor_states": {k: {sk: {'value': v.get('value', 'OFF'), 'last_update': v.get('last_update', 0), 'delay_off': v.get('delay_off', 0)} for sk, v in v.items()} for k, v in sensor_states.items()},
+        "sensor_states": {k: {sk: {'value': sv.get('value', 'OFF'), 'last_update': sv.get('last_update', 0), 'delay_off': sv.get('delay_off', 0)} for sk, sv in v.items()} for k, v in sensor_states.items()},
         "command_sensors": command_sensors
     }
     try:
@@ -146,6 +148,29 @@ def save_state():
 def save_config(config):
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
+
+# Reset binary sensor states to OFF
+def clear_binary_sensor_states():
+    global sensor_states, custom_sensors, mqtt_client
+    for node_id in custom_sensors:
+        if node_id not in sensor_states:
+            sensor_states[node_id] = {}
+        for sensor in custom_sensors[node_id]:
+            if sensor["value_type"] == "binary":
+                sensor_name = sensor["sensor_name"]
+                topic = f"{config['mqtt_topic_prefix']}/{node_id}/{sensor['topic']}/{sensor_name}"
+                if sensor_name in sensor_states[node_id] and sensor_states[node_id][sensor_name].get("timer"):
+                    sensor_states[node_id][sensor_name]["timer"].cancel()
+                sensor_states[node_id][sensor_name] = {
+                    "value": "OFF",
+                    "last_update": time.time(),
+                    "timer": None,
+                    "delay_off": sensor.get("delay_off", 0)
+                }
+                if mqtt_client and mqtt_client.is_connected():
+                    mqtt_client.publish(topic, "OFF", retain=True)
+                    logger.info(f"📊 Reset binary sensor {sensor_name} for {node_id} to OFF on topic {topic}")
+    save_state()
 
 config = load_config()
 load_state()
@@ -260,6 +285,8 @@ def connect_mqtt():
         mqtt_client.subscribe(f"{config.get('mqtt_topic_prefix','Mesh/feeds')}/+/+/text")
         mqtt_client.subscribe(f"{config.get('mqtt_topic_prefix','Mesh/feeds')}/+/command/+")
         logger.info("🔗 Connected to MQTT broker")
+        # Clear binary sensor states after connection
+        clear_binary_sensor_states()
     except Exception as e:
         logger.error(f"Failed to initialize MQTT client: {e}")
         mqtt_status = f"Error: {e}"
@@ -527,23 +554,29 @@ def handle_packet(packet, interface=None):
                     pattern = sensor["pattern"].lower()
                     topic = f"{config['mqtt_topic_prefix']}/{node_id}/{sensor['topic']}/{sensor['sensor_name']}"
                     if sensor["value_type"] == "numeric":
-                        match = re.search(rf'(?:\b{pattern}\b)\s*(\d+\.?\d*)', text.lower(), re.IGNORECASE)
-                        value = float(match.group(1)) if match else None
-                        if value is not None:
-                            mqtt_client.publish(topic, str(value), retain=True)
-                            logger.info(f"📊 Published numeric sensor {sensor['sensor_name']} for {node_id}: {value} ➜ {topic}")
-                            if sensor["sensor_name"] not in known_nodes.get(node_id, set()):
-                                known_nodes[node_id].add(sensor["sensor_name"])
-                                if node_id in enabled_nodes:
-                                    publish_ha_discovery(node_id, sensor["sensor_name"], "sensor")
+                        match = re.search(rf'\b{re.escape(pattern)}\s*([-]?\d+\.?\d*)', text.lower(), re.IGNORECASE)
+                        if match:
+                            try:
+                                value = float(match.group(1))
+                                mqtt_client.publish(topic, str(value), retain=True)
+                                logger.info(f"📊 Published numeric sensor {sensor['sensor_name']} for {node_id}: {value} ➜ {topic}")
+                                if sensor["sensor_name"] not in known_nodes.get(node_id, set()):
+                                    known_nodes[node_id].add(sensor["sensor_name"])
+                                    if node_id in enabled_nodes:
+                                        publish_ha_discovery(node_id, sensor["sensor_name"], "sensor")
+                                        # Publish initial state for numeric sensor
+                                        mqtt_client.publish(topic, "0", retain=True)
+                            except ValueError:
+                                logger.warning(f"Invalid numeric value for {sensor['sensor_name']} in {node_id}: {match.group(1)}")
                     elif sensor["value_type"] == "binary":
-                        current_state = sensor_states[node_id].get(sensor["sensor_name"], {"value": "OFF", "last_update": 0, "timer": None})
-                        match = re.search(rf'\b{pattern}\b', text.lower()) or "detected" in text.lower()
+                        current_state = sensor_states[node_id].get(sensor["sensor_name"], {"value": "OFF", "last_update": 0, "timer": None, "delay_off": sensor.get("delay_off", 0)})
+                        match = re.search(rf'\b{re.escape(pattern)}\b', text.lower(), re.IGNORECASE) or "detected" in text.lower()
                         cleared = "cleared" in text.lower()
+                        new_state = current_state["value"]
                         if match or cleared:
+                            new_state = "ON" if match else "OFF"
                             if current_state.get("timer"):
                                 current_state["timer"].cancel()
-                            new_state = "ON" if match else "OFF" if cleared else current_state["value"]
                             mqtt_client.publish(topic, new_state, retain=True)
                             logger.info(f"📊 Published binary sensor {sensor['sensor_name']} for {node_id}: {new_state} ➜ {topic}")
                             current_state["value"] = new_state
@@ -555,18 +588,21 @@ def handle_packet(packet, interface=None):
                         if sensor.get("delay_off", 0) > 0 and new_state == "ON":
                             if current_state.get("timer"):
                                 current_state["timer"].cancel()
-                            def auto_off(topic=topic):
-                                if node_id in sensor_states and sensor["sensor_name"] in sensor_states[node_id]:
-                                    current = sensor_states[node_id][sensor["sensor_name"]]
+                            def auto_off(topic=topic, sensor_name=sensor["sensor_name"], node_id=node_id):
+                                if node_id in sensor_states and sensor_name in sensor_states[node_id]:
+                                    current = sensor_states[node_id][sensor_name]
                                     if current["value"] == "ON" and time.time() - current["last_update"] >= sensor["delay_off"]:
                                         mqtt_client.publish(topic, "OFF", retain=True)
-                                        logger.info(f"📊 Auto-off triggered for {sensor['sensor_name']} after {sensor['delay_off']} seconds")
+                                        logger.info(f"📊 Auto-off triggered for {sensor_name} after {sensor['delay_off']} seconds")
                                         current["value"] = "OFF"
-                                        sensor_states[node_id][sensor["sensor_name"]] = current
+                                        current["timer"] = None
+                                        sensor_states[node_id][sensor_name] = current
+                                        save_state()
                             timer = threading.Timer(sensor["delay_off"], auto_off)
                             timer.start()
                             current_state["timer"] = timer
                         sensor_states[node_id][sensor["sensor_name"]] = current_state
+                        save_state()
             update_event.set()
 
         if "telemetry" in decoded:
@@ -737,7 +773,6 @@ def configure_sensor(node_id):
                 # Determine entity_type before modifying custom_sensors
                 sensor_config = next((s for s in custom_sensors[node_id] if s["sensor_name"] == sensor_name), None)
                 entity_type = "binary_sensor" if sensor_config and sensor_config["value_type"] == "binary" else "sensor"
-
                 if node_id in sensor_states and sensor_name in sensor_states[node_id]:
                     current_state = sensor_states[node_id][sensor_name]
                     if current_state.get("timer"):
