@@ -176,13 +176,24 @@ config = load_config()
 load_state()
 
 # -------------------- SINGLE INSTANCE CHECK --------------------
+import atexit
+def cleanup_lock_file():
+    if os.path.exists(LOCK_FILE):
+        os.remove(LOCK_FILE)
+atexit.register(cleanup_lock_file)
+
 if os.path.exists(LOCK_FILE):
-    logger.error("Another instance is already running. Exiting.")
-    exit(1)
+    try:
+        with open(LOCK_FILE, "r") as f:
+            pid = int(f.read().strip())
+        os.kill(pid, 0)  # Check if process exists
+        logger.error("Another instance is already running. Exiting.")
+        exit(1)
+    except (ValueError, OSError):
+        logger.info("Stale lock file found. Removing and continuing.")
+        os.remove(LOCK_FILE)
 with open(LOCK_FILE, "w") as f:
     f.write(str(os.getpid()))
-import atexit
-atexit.register(lambda: os.remove(LOCK_FILE))
 
 # -------------------- MESHTASTIC --------------------
 def connect_meshtastic():
