@@ -1,7 +1,7 @@
 ```markdown
 # MeshMQTT
 
-MeshMQTT is a project that integrates Meshtastic with MQTT and provides a web dashboard for monitoring and control on a Raspberry Pi.
+MeshMQTT is a project that integrates Meshtastic connects to private Mqtt ands provides a web dashboard for creating sensors in home Assistant on a Raspberry Pi.
 
 ## Prerequisites
 
