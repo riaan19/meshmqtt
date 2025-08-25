@@ -1,111 +1,81 @@
 # MeshMQTT
 
-A lightweight MQTT mesh bridge for integrating Meshtastic networks with Home Assistant.
+MeshMQTT integrates Meshtastic with a private MQTT broker and provides a web dashboard for creating sensors in Home Assistant on a Raspberry Pi.
 
 ## Overview
 
-MeshMQTT is a tool designed to bridge messages between a Meshtastic mesh network and an MQTT broker, enabling seamless integration with Home Assistant for home automation and monitoring. This project allows Meshtastic nodes to communicate over MQTT, facilitating real-time data exchange and control within your smart home ecosystem.
+This project connects Meshtastic LoRa devices to a private MQTT broker, enabling seamless integration with Home Assistant. It includes a web dashboard to manage and visualize sensor data, designed to run on a Raspberry Pi for home automation applications.
 
-## Features
+## Prerequisites
 
-- **Meshtastic Integration**: Connects Meshtastic mesh networks to an MQTT broker.
-- **Home Assistant Compatibility**: Publishes mesh data to MQTT topics for easy integration with Home Assistant.
-- **Configurable**: Supports custom MQTT server settings and channel configurations.
-- **Lightweight**: Minimal resource usage for running on various platforms.
-
-## Requirements
-
-- Python 3.8 or higher
-- Meshtastic device with MQTT module enabled
-- MQTT broker (e.g., Mosquitto)
-- Home Assistant (optional, for HA integration)
-- Required Python libraries:
-  - `meshtastic`
-  - `paho-mqtt`
-  - `cryptography` (for encrypted channels)
-
-Install dependencies using:
-```bash
-pip install meshtastic paho-mqtt cryptography
-```
+- **Raspberry Pi**: Models 2, 3, 4, 5, Zero, or Zero 2 W (Pi 4/5 recommended for best performance).
+- **Operating System**: Raspberry Pi OS (32-bit or 64-bit recommended).
+- **Meshtastic Device**: A compatible LoRa radio connected via USB or serial.
+- **Internet Connection**: Required for downloading dependencies and cloning the repository.
+- **Storage**: At least 2 GB of free space on the SD card.
+- **User Permissions**: Access to a user account with `sudo` privileges.
 
 ## Installation
 
-1. Clone the repository:
+The `install_meshmqtt.sh` script automates the setup process, installing dependencies, setting up a virtual environment, and configuring the service to run on boot. It dynamically uses the current logged-in user's home directory.
+
+### Steps to Install
+
+1. **Download the Repository** (if not already cloned):
    ```bash
    git clone https://github.com/riaan19/meshmqtt.git
    cd meshmqtt
    ```
 
-2. Install the required Python packages:
+2. **Make the Script Executable**:
    ```bash
-   pip install -r requirements.txt
+   chmod +x install_meshmqtt.sh
    ```
 
-3. Configure your Meshtastic device to enable MQTT (see [Meshtastic MQTT Configuration](https://meshtastic.org/docs/configuration/mqtt/)).
-
-## Usage
-
-1. Configure your MQTT broker settings in `config.json` (example provided in the repository).
-2. Run the bridge:
+3. **Run the Installation Script**:
    ```bash
-   python meshmqtt.py
+   sudo ./install_meshmqtt.sh
    ```
 
-### Example Configuration
+4. **Verify the Service**:
+   - Check the service status:
+     ```bash
+     sudo systemctl status meshmqtt.service
+     ```
+   - View logs for debugging:
+     ```bash
+     journalctl -u meshmqtt.service
+     ```
 
-Create a `config.json` file with the following structure:
+5. **Access the Dashboard**:
+   - Open a browser and navigate to `http://<raspberry-pi-ip>:5000` (replace `<raspberry-pi-ip>` with your Pi's IP address).
+   - Check `mesh_dashboard.py` for the exact port if different.
 
-```json
-{
-  "mqtt": {
-    "host": "your.mqtt.broker",
-    "port": 1883,
-    "username": "your_username",
-    "password": "your_password",
-    "root_topic": "msh/US"
-  },
-  "meshtastic": {
-    "channel": "LongFast",
-    "uplink_enabled": true,
-    "downlink_enabled": true
-  }
-}
-```
+## Configuration
 
-- `host`: Address of your MQTT broker.
-- `port`: MQTT broker port (default: 1883).
-- `username` and `password`: Credentials for the MQTT broker.
-- `root_topic`: MQTT root topic (e.g., `msh/US`).
-- `channel`: Meshtastic channel name.
-- `uplink_enabled` and `downlink_enabled`: Enable/disable message forwarding.
+- **Meshtastic Device**: Ensure your LoRa radio is connected via USB or serial. Update `config.json` (if used) with the correct serial port or device settings.
+- **MQTT Broker**: Configure MQTT settings in `config.json` or the main script if required.
+- **Customizations**: Edit `mesh_dashboard.py` or other files in `~/meshmqtt` (your home directory) for specific configurations.
 
-## Home Assistant Integration
+## Troubleshooting
 
-To integrate with Home Assistant:
+- **Service Fails to Start**:
+  - Check logs: `journalctl -u meshmqtt.service`
+  - Ensure the Meshtastic device is connected and the serial port is correct.
+  - Verify `mesh_dashboard.py` exists and is error-free.
+- **Dependency Issues**:
+  - Rerun `sudo apt install -y libffi-dev libssl-dev` and `pip install` commands in the virtual environment.
+- **Dashboard Not Accessible**:
+  - Confirm the Pi's IP address (`hostname -I`) and port.
+  - Check firewall settings or network connectivity.
 
-1. Ensure your MQTT broker is configured in Home Assistant.
-2. Add sensors or automations in Home Assistant to subscribe to the MQTT topics (e.g., `msh/US/2/json/LongFast/#`).
-3. Use Home Assistant to visualize or act on Meshtastic data (e.g., node telemetry, messages).
+## Notes
+
+- The script assumes `mesh_dashboard.py` is the main script. Update the systemd service file (`/etc/systemd/system/meshmqtt.service`) if your main script has a different name.
+- The script uses the current logged-in user's home directory (e.g., `/home/<your-username>/meshmqtt`) for installation.
+- For Raspberry Pi Zero or older models, ensure sufficient memory (consider increasing swap space) to handle dependency installation.
+- If using a non-Raspberry Pi OS, modify the script's package installation commands (e.g., use `dnf` for Fedora-based systems).
 
 ## Contributing
 
-Contributions are welcome! To contribute:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -m "Add your feature"`).
-4. Push to the branch (`git push origin feature/your-feature`).
-5. Open a pull request.
-
-Please ensure your code follows the project's coding style and includes tests where applicable.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Meshtastic](https://meshtastic.org) for the open-source mesh networking protocol.
-- [Home Assistant](https://www.home-assistant.io) for the home automation platform.
-- Community contributors for feedback and support.
+For issues or contributions, please open an issue or pull request on the [GitHub repository](https://github.com/riaan19/meshmqtt).
