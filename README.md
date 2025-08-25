@@ -233,7 +233,7 @@ To update MeshMQTT to the latest version:
 - If using a non-Raspberry Pi OS, modify the script's package installation commands (e.g., use `dnf` for Fedora-based systems).
 - Regularly check for updates to the MeshMQTT repository to get the latest features and fixes.
 
-If you encounter issues, provide the output of:
+If you encounter issues, look at  the output of:
 
 - `sudo systemctl status meshmqtt.service`
 - `/tmp/meshmqtt_install.log`
