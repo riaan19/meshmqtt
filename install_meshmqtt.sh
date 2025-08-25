@@ -1,9 +1,10 @@
+```bash
 #!/bin/bash
 
 # This script automates the installation of the MeshMQTT project on a Raspberry Pi.
 # It sets up a virtual environment, installs dependencies, and configures the main script
 # to run on startup using systemd. It uses the logged-in user's username for paths and
-# service configuration, even when run with sudo.
+# service configuration, even when run with sudo, and ensures all files are owned by the user.
 
 set -e  # Exit on any error
 
@@ -44,49 +45,62 @@ check_status "Failed to install system dependencies"
 
 # Check if the installation directory exists
 if [ -d "$INSTALL_DIR" ]; then
-    echo "Directory $INSTALL_DIR already exists. Skipping git clone."
-else
-    # Clone the repository to the current user's home directory
-    echo "Cloning MeshMQTT repository..."
-    git clone https://github.com/riaan19/meshmqtt.git "$INSTALL_DIR"
-    check_status "Failed to clone repository"
+    echo "Directory $INSTALL_DIR already exists. Removing and performing a clean install..."
+    sudo rm -rf "$INSTALL_DIR"
+    check_status "Failed to remove existing $INSTALL_DIR"
 fi
 
-# Change ownership to current user
+# Clone the repository to the current user's home directory
+echo "Cloning MeshMQTT repository..."
+sudo -u "$CURRENT_USER" git clone https://github.com/riaan19/meshmqtt.git "$INSTALL_DIR"
+check_status "Failed to clone repository"
+
+# Ensure ownership of the installation directory
 sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
-check_status "Failed to set ownership of $INSTALL_DIR"
+sudo chmod -R u+rwX "$INSTALL_DIR"
+check_status "Failed to set ownership and permissions of $INSTALL_DIR"
 
 # Change to the project directory
 cd "$INSTALL_DIR"
 check_status "Failed to change to $INSTALL_DIR"
 
-# Create and activate virtual environment
+# Create and activate virtual environment as the current user
 echo "Creating and activating virtual environment..."
-python3 -m venv venv
+sudo -u "$CURRENT_USER" python3 -m venv venv
 check_status "Failed to create virtual environment"
+sudo -u "$CURRENT_USER" chmod -R u+rwX venv
+check_status "Failed to set permissions for virtual environment"
 source venv/bin/activate
 check_status "Failed to activate virtual environment"
 
-# Install Python dependencies
+# Install Python dependencies as the current user
 echo "Installing Python dependencies..."
-pip install meshtastic paho-mqtt flask
+sudo -u "$CURRENT_USER" pip install meshtastic paho-mqtt flask
 check_status "Failed to install Python dependencies"
 
 # Deactivate the virtual environment
 deactivate
+
+# Ensure ownership of all files after installation
+sudo chown -R "$CURRENT_USER:$CURRENT_USER" "$INSTALL_DIR"
+sudo chmod -R u+rwX "$INSTALL_DIR"
+check_status "Failed to set final ownership and permissions of $INSTALL_DIR"
 
 # Create systemd service file for auto-start
 echo "Creating systemd service file..."
 sudo tee /etc/systemd/system/meshmqtt.service > /dev/null << EOF
 [Unit]
 Description=MeshMQTT Dashboard Service
-After=multi-user.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=$CURRENT_USER
+Group=$CURRENT_USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/mesh_dashboard.py
+ExecStart=$INSTALL_DIR/venv/bin/python3 $INSTALL_DIR/mesh_dashboard.py
 Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -109,3 +123,4 @@ sudo systemctl status meshmqtt.service
 echo "Installation complete. The meshmqtt service is now running and set to start on boot."
 echo "If you need to configure config.json or other files, edit them in $INSTALL_DIR."
 echo "The dashboard is accessible via http://$(hostname -I | awk '{print $1}'):5000 (check mesh_dashboard.py for port details)."
+```
