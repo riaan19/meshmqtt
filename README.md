@@ -1,6 +1,6 @@
 # MeshMQTT
 
-MeshMQTT integrates Meshtastic with a private MQTT broker and provides a web dashboard for creating sensors in Home Assistant on a Raspberry Pi. This is for my own use and should not be used by anyone else; I'm posting it here for reference.
+MeshMQTT integrates Meshtastic with a private MQTT broker and provides a web dashboard for creating sensors in Home Assistant on a Raspberry Pi. This is for my own use and should not really be used by anyone else; if you break it not my problem. I'm posting it here for my own reference.
 
 ## Overview
 
@@ -76,6 +76,4 @@ The `install_meshmqtt.sh` script automates the setup process, installing depende
 - For Raspberry Pi Zero or older models, ensure sufficient memory (consider increasing swap space) to handle dependency installation.
 - If using a non-Raspberry Pi OS, modify the script's package installation commands (e.g., use `dnf` for Fedora-based systems).
 
-## Contributing
 
-For issues or contributions, please open an issue or pull request on the [GitHub repository](https://github.com/riaan19/meshmqtt).
